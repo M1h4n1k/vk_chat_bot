@@ -1,3 +1,4 @@
+import config
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import sqlite3
@@ -7,10 +8,9 @@ import json
 
 
 
-token = 'токен'
-vk_session = vk_api.VkApi(token=token)
+vk_session = vk_api.VkApi(token=config.token)
 vk = vk_session.get_api()
-lp = VkBotLongPoll(vk_session, 'группа')
+lp = VkBotLongPoll(vk_session, config.group_id)
 
 conn = sqlite3.connect('main_table.db')
 cur = conn.cursor()
@@ -99,6 +99,7 @@ def main():
 				user_id = get_user_id(event.message.text)
 				delete_admin(user_id, event.message.peer_id)
 			elif event.message.text == '/del':
+
 				for msg in event.message.fwd_messages:
 					try:
 						vk.messages.delete(v='5.131', delete_for_all=1,
@@ -106,13 +107,16 @@ def main():
 										peer_id=event.message.peer_id)
 					except vk_api.exceptions.ApiError:
 						traceback.print_exc()
-				vk.messages.delete(v='5.131', delete_for_all=1,
-								conversation_message_ids=event.message.conversation_message_id,
-								peer_id=event.message.peer_id)
-				vk.messages.send(message=f'Удалил {len(event.message.fwd_messages)} беброчек',
-								v='5.131',
-								peer_id=event.message.peer_id,
-								random_id=0)
+				try:
+					vk.messages.delete(v='5.131', delete_for_all=1,
+									conversation_message_ids=event.message.conversation_message_id,
+									peer_id=event.message.peer_id)
+					vk.messages.send(message=f'Удалил {len(event.message.fwd_messages)} беброчек',
+									v='5.131',
+									peer_id=event.message.peer_id,
+									random_id=0)
+				except vk_api.exceptions.ApiError:
+					traceback.print_exc()
 		if event.message.text == '/swap':
 			try:
 				vk.messages.send(message=swap_layout(event.message.reply_message.get('text')),
