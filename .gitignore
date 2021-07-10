@@ -2,3 +2,4 @@
 main_table.db
 .idea/
 config.py
+__pycache__/
