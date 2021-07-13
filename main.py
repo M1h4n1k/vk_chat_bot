@@ -5,7 +5,7 @@ import sqlite3
 import re
 import traceback
 import json
-
+from collections import Counter
 
 
 vk_session = vk_api.VkApi(token=config.token)
@@ -68,17 +68,55 @@ def check_admin(user_id, chat_id):
 	return cur.fetchone() is not None or user_id == 575312782
 
 
-
-def swap_layout(text: str):
-	start_text = text
+def get_layout(text: str) -> str:
 	eng_chars = u"~!@#$%^&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:\"|ZXCVBNM<>?"
 	rus_chars = u"ё!\"№;%:?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭ/ЯЧСМИТЬБЮ,"
-	for e, r in zip(eng_chars, rus_chars):
-		text = text.replace(e, r)
-	if text == start_text:
+	letters = {
+		'eng_letters': 0,
+		'rus_letters': 0
+	}
+	for i in text:
+		if i in eng_chars:
+			letters['eng_letters'] += 1
+		if i in rus_chars:
+			letters['rus_letters'] += 1
+	return 'english' if letters['eng_letters'] > letters['rus_letters'] else 'russian'
+
+
+def swap_layout(text: str):
+	eng_chars = u"~!@#$%^&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:\"|ZXCVBNM<>?"
+	rus_chars = u"ё!\"№;%:?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭ/ЯЧСМИТЬБЮ,"
+	if get_layout(text) == 'english':
+		for e, r in zip(eng_chars, rus_chars):
+			text = text.replace(e, r)
+	else:
 		for e, r in zip(rus_chars, eng_chars):
 			text = text.replace(e, r)
 	return text
+
+
+def make_rip(text: str):  # ахуевшая, гениальная фича
+	last_word = text.split()[-1]
+	vowels = 'аеиоуёэюя'
+	last_pos1 = last_pos2 = -1
+	for v in vowels:  # TODO хуйня некрасивая, переписать потом
+		if last_word.rfind(v) > last_pos1:
+			last_pos2 = last_pos1
+			last_pos1 = last_word.rfind(v)
+	if last_pos2 == -1:
+		xd_word = last_word[last_pos1:]
+	else:
+		xd_word = last_word[last_pos2:]
+
+	swaps = {
+		'а': 'я',
+		'о': 'ё',
+		'у': 'ю',
+		'э': 'е'
+	}
+	xd_word = 'ху' + swaps.get(xd_word[0], xd_word[0]) + xd_word[1:]
+	return xd_word
+
 
 
 def main():
@@ -98,8 +136,7 @@ def main():
 			elif re.match(r'/deladm @?[0-9A-z_.]*', event.message.text):
 				user_id = get_user_id(event.message.text)
 				delete_admin(user_id, event.message.peer_id)
-			elif event.message.text == '/del':
-
+			elif re.match(r'/del', event.message.text):
 				for msg in event.message.fwd_messages:
 					try:
 						vk.messages.delete(v='5.131', delete_for_all=1,
@@ -117,9 +154,25 @@ def main():
 									random_id=0)
 				except vk_api.exceptions.ApiError:
 					traceback.print_exc()
-		if event.message.text == '/swap':
+		if re.match(r'/swap', event.message.text):  # TODO объединить эту хуйню и хуйню ниже, чтобы меньше строк было
 			try:
 				vk.messages.send(message=swap_layout(event.message.reply_message.get('text')),
+								v='5.131',
+								peer_id=event.message.peer_id,
+								random_id=0,
+								forward=json.dumps({
+									'peer_id': event.message.peer_id,
+									'conversation_message_ids': event.message.reply_message.get('conversation_message_id'),
+									'is_reply': True
+								}))
+				vk.messages.delete(v='5.131', delete_for_all=1,
+								conversation_message_ids=event.message.conversation_message_id,
+								peer_id=event.message.peer_id)
+			except vk_api.exceptions.ApiError:
+				traceback.print_exc()
+		elif re.match(r'/rip', event.message.text):
+			try:
+				vk.messages.send(message=make_rip(event.message.reply_message.get('text')),
 								v='5.131',
 								peer_id=event.message.peer_id,
 								random_id=0,
