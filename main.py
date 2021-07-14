@@ -1,71 +1,28 @@
 import config
-import vk_api
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-import sqlite3
+import json
+import random
 import re
 import traceback
-import json
-from collections import Counter
+import vk_api
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+
+import database_api
 
 
 vk_session = vk_api.VkApi(token=config.token)
 vk = vk_session.get_api()
 lp = VkBotLongPoll(vk_session, config.group_id)
 
-conn = sqlite3.connect('main_table.db')
-cur = conn.cursor()
-cur.execute('''CREATE TABLE IF NOT EXISTS muted_pigs (
-							user_id INTEGER,
-							chat_id INTEGER
-						);''')
-cur.execute('''CREATE TABLE IF NOT EXISTS admins (
-							user_id INTEGER,
-							chat_id INTEGER
-						);''')
+db = database_api.Database()
 
 
-def mute_pig(user_id, chat_id):
-	cur.execute('''INSERT INTO muted_pigs (user_id, chat_id) 
-					VALUES(?, ?)''', (user_id, chat_id))
-	conn.commit()
-
-
-def unmute_pig(user_id, chat_id):
-	cur.execute('''DELETE FROM muted_pigs 
-				WHERE user_id=? AND chat_id=?''', (user_id, chat_id))
-	conn.commit()
-
-
-def check_muted_pig(user_id, chat_id):
-	cur.execute('''SELECT 1 FROM muted_pigs WHERE user_id=? AND chat_id=?''', (user_id, chat_id))
-	return cur.fetchone() is not None
-
-
-def get_user_id(raw_id):
+def get_user_id(raw_id):  # TODO hueta perepisat'
 	user_id = raw_id.split()[1].split('|')[0].replace('[', '')
 	raw_user_id = vk.utils.resolveScreenName(v='5.131', screen_name=user_id)
 	user_id = raw_user_id.get('object_id')
 	if raw_user_id.get('type') == 'group':
 		user_id *= -1
 	return user_id
-
-
-
-def add_admin(user_id, chat_id):
-	cur.execute('''INSERT INTO admins (user_id, chat_id) 
-						VALUES(?, ?)''', (user_id, chat_id))
-	conn.commit()
-
-
-def delete_admin(user_id, chat_id):
-	cur.execute('''DELETE FROM admins 
-					WHERE user_id=? AND chat_id=?''', (user_id, chat_id))
-	conn.commit()
-
-
-def check_admin(user_id, chat_id):
-	cur.execute('''SELECT 1 FROM admins WHERE user_id=? AND chat_id=?''', (user_id, chat_id))
-	return cur.fetchone() is not None or user_id == 575312782
 
 
 def get_layout(text: str) -> str:
@@ -80,13 +37,13 @@ def get_layout(text: str) -> str:
 			letters['eng_letters'] += 1
 		if i in rus_chars:
 			letters['rus_letters'] += 1
-	return 'english' if letters['eng_letters'] > letters['rus_letters'] else 'russian'
+	return 'eng' if letters['eng_letters'] > letters['rus_letters'] else 'rus'
 
 
 def swap_layout(text: str):
 	eng_chars = u"~!@#$%^&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:\"|ZXCVBNM<>?"
 	rus_chars = u"ё!\"№;%:?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭ/ЯЧСМИТЬБЮ,"
-	if get_layout(text) == 'english':
+	if get_layout(text) == 'eng':
 		for e, r in zip(eng_chars, rus_chars):
 			text = text.replace(e, r)
 	else:
@@ -97,7 +54,7 @@ def swap_layout(text: str):
 
 def make_rip(text: str):  # ахуевшая, гениальная фича  # TODO хуевый, надо по ударениям искать. Найти открытое апи для ударения в слове
 	last_word = text.split()[-1].lower()
-	vowels = 'аеиоуёэюя'
+	vowels = 'аеиоуёэюяы'
 	last_pos1 = last_pos2 = last_pos3 = -1
 	for i in range(len(last_word)):
 		if last_word[i] in vowels:
@@ -122,23 +79,31 @@ def make_rip(text: str):  # ахуевшая, гениальная фича  # T
 
 
 
+FEATURES = ['rip']  # гениальное решение (я еблан)
+
+
+
 def main():
 	for event in lp.listen():
 		if event.type != VkBotEventType.MESSAGE_NEW:
 			continue
-		if check_admin(event.message.from_id, event.message.peer_id):
+		if db.check_admin(event.message.from_id, event.message.peer_id):  # в теории юзера можно вынести
 			if re.match(r'/mute @?[0-9A-z_.]*', event.message.text):
 				user_id = get_user_id(event.message.text)
-				mute_pig(user_id, event.message.peer_id)
+				db.mute_pig(user_id, event.message.peer_id)
 			elif re.match(r'/unmute @?[0-9A-z_.]*', event.message.text):
 				user_id = get_user_id(event.message.text)
-				unmute_pig(user_id, event.message.peer_id)
+				db.unmute_pig(user_id, event.message.peer_id)
 			elif re.match(r'/addadm @?[0-9A-z_.]*', event.message.text):
 				user_id = get_user_id(event.message.text)
-				add_admin(user_id, event.message.peer_id)
+				db.add_admin(user_id, event.message.peer_id)
 			elif re.match(r'/deladm @?[0-9A-z_.]*', event.message.text):
 				user_id = get_user_id(event.message.text)
-				delete_admin(user_id, event.message.peer_id)
+				db.delete_admin(user_id, event.message.peer_id)
+			elif re.match(r'/chance [A-z0-9] [01]?\.[0-9]*', event.message.text):
+				db.set_feature_chance(feature=event.message.text.split()[1],
+										chat_id=event.message.peer_id,
+										chance=float(event.message.text.split()[2]))
 			elif re.match(r'/del', event.message.text):
 				for msg in event.message.fwd_messages:
 					try:
@@ -157,6 +122,14 @@ def main():
 									random_id=0)
 				except vk_api.exceptions.ApiError:
 					traceback.print_exc()
+		if db.check_muted_pig(event.message.from_id, event.message.peer_id):
+			try:
+				vk.messages.delete(v='5.131', delete_for_all=1,
+								conversation_message_ids=event.message.conversation_message_id,
+								peer_id=event.message.peer_id)
+			except vk_api.exceptions.ApiError:
+				traceback.print_exc()
+			continue  # мнение замученных свиней не учитывается => их команды идут нахуй
 		if re.match(r'/swap', event.message.text):  # TODO объединить эту хуйню и хуйню ниже, чтобы меньше строк было
 			try:
 				vk.messages.send(message=swap_layout(event.message.reply_message.get('text')),
@@ -189,15 +162,23 @@ def main():
 								peer_id=event.message.peer_id)
 			except vk_api.exceptions.ApiError:
 				traceback.print_exc()
-		if check_muted_pig(event.message.from_id, event.message.peer_id):
-			try:
-				vk.messages.delete(v='5.131', delete_for_all=1,
-								conversation_message_ids=event.message.conversation_message_id,
-								peer_id=event.message.peer_id)
-			except vk_api.exceptions.ApiError:
-				traceback.print_exc()
+		feature_random = random.random()
+		for f in FEATURES:
+			if feature_random < db.get_feature_chance(event.message.peer_id, f):
+				# сделать словарь с фичами и функциями к ним и запускать функцию из словаря сразу, только для этого сначала еще все пиреписать надо на функции будет
+				try:
+					vk.messages.send(message=make_rip(event.message.text),
+										v='5.131',
+										peer_id=event.message.peer_id,
+										random_id=0,
+										forward=json.dumps({
+											'peer_id': event.message.peer_id,
+											'conversation_message_ids': event.message.conversation_message_id,
+											'is_reply': True
+										}))
+				except vk_api.exceptions.ApiError:
+					traceback.print_exc()
 
 
 if __name__ == '__main__':
-	# print(make_rip('надо бы добавить фичу'))
 	main()
