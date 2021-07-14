@@ -99,12 +99,12 @@ def make_rip(text: str):  # ахуевшая, гениальная фича  # T
 	last_word = text.split()[-1].lower()
 	vowels = 'аеиоуёэюя'
 	last_pos1 = last_pos2 = last_pos3 = -1
-	for i in range(len(text)):
-		if text[i] in vowels:
+	for i in range(len(last_word)):
+		if last_word[i] in vowels:
 			last_pos3 = last_pos2
 			last_pos2 = last_pos1
 			last_pos1 = i
-	if last_pos1 - last_pos2 == 1:
+	if last_pos1 - last_pos2 == 1 and last_pos3 != -1:
 		xd_word = last_word[last_pos3:]
 	elif last_pos2 == -1:
 		xd_word = last_word[last_pos1:]
@@ -199,4 +199,5 @@ def main():
 
 
 if __name__ == '__main__':
+	# print(make_rip('надо бы добавить фичу'))
 	main()
