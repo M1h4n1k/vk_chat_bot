@@ -49,10 +49,15 @@ class Database:
 
 	def get_feature_chance(self, chat_id: int, feature: str) -> int:
 		self.cur.execute('''SELECT chance FROM feature_chances WHERE feature=? AND chat_id=?''', (feature, chat_id))
-		chance = self.cur.fetchone() or [0]
+		chance = self.cur.fetchone() or [-1]
 		return chance[0]
 
 	def set_feature_chance(self, chat_id: int, feature: str, chance: float):
-		self.cur.execute('''INSERT INTO feature_chances (chance, chat_id, feature) 
-						VALUES(?, ?, ?)''', (chance, chat_id, feature))
+		if self.get_feature_chance(chat_id, feature) == -1:
+			self.cur.execute('''INSERT INTO feature_chances (chance, chat_id, feature) 
+							VALUES(?, ?, ?)''', (chance, chat_id, feature))
+		else:
+			self.cur.execute('''UPDATE feature_chances
+								SET chance=?
+								WHERE chat_id=? AND feature=?''', (chance, chat_id, feature))
 		self.conn.commit()
