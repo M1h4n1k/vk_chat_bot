@@ -95,15 +95,18 @@ def swap_layout(text: str):
 	return text
 
 
-def make_rip(text: str):  # ахуевшая, гениальная фича
-	last_word = text.split()[-1]
+def make_rip(text: str):  # ахуевшая, гениальная фича  # TODO хуевый, надо по ударениям искать. Найти открытое апи для ударения в слове
+	last_word = text.split()[-1].lower()
 	vowels = 'аеиоуёэюя'
-	last_pos1 = last_pos2 = -1
-	for v in vowels:  # TODO хуйня некрасивая, переписать потом
-		if last_word.rfind(v) > last_pos1:
+	last_pos1 = last_pos2 = last_pos3 = -1
+	for i in range(len(text)):
+		if text[i] in vowels:
+			last_pos3 = last_pos2
 			last_pos2 = last_pos1
-			last_pos1 = last_word.rfind(v)
-	if last_pos2 == -1:
+			last_pos1 = i
+	if last_pos1 - last_pos2 == 1:
+		xd_word = last_word[last_pos3:]
+	elif last_pos2 == -1:
 		xd_word = last_word[last_pos1:]
 	else:
 		xd_word = last_word[last_pos2:]
