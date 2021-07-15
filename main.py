@@ -19,7 +19,11 @@ db = database_api.Database()
 
 
 def get_user_id(raw_id):  # TODO hueta perepisat'
-	user_id = raw_id.split()[1].split('|')[0].replace('[', '')
+	user_id = re.search(r'(id|club)[0-9]+', raw_id)
+	if user_id is not None:
+		user_id = user_id.group(0)
+	else:
+		return None
 	raw_user_id = vk.utils.resolveScreenName(v='5.131', screen_name=user_id)
 	user_id = raw_user_id.get('object_id')
 	if raw_user_id.get('type') == 'group':
@@ -53,6 +57,11 @@ def swap_layout(text: str):
 			text = text.replace(e, r)
 	return text
 
+
+def get_chat_admins(peer_id: int):
+	users = vk.messages.getConversationMembers(v='5.144', peer_id=peer_id, extended=1).get('items', [])
+	admins = [user['member_id'] for user in users if user.get('is_admin', False)]
+	return admins
 
 
 def make_rip(text: str):  # ахуевшая, гениальная фича  # TODO хуевый, надо по ударениям искать. Найти открытое апи для ударения в слове
@@ -94,25 +103,30 @@ def main():
 	for event in lp.listen():
 		if event.type != VkBotEventType.MESSAGE_NEW:
 			continue
-		if db.check_admin(event.message.from_id, event.message.peer_id):  # в теории юзера можно вынести
-			if re.match(r'/mute @?[0-9A-z_.]*', event.message.text):
-				user_id = get_user_id(event.message.text)
-				db.mute_pig(user_id, event.message.peer_id)
-			elif re.match(r'/unmute @?[0-9A-z_.]*', event.message.text):
-				user_id = get_user_id(event.message.text)
-				db.unmute_pig(user_id, event.message.peer_id)
-			elif re.match(r'/addadm @?[0-9A-z_.]*', event.message.text):
-				user_id = get_user_id(event.message.text)
-				db.add_admin(user_id, event.message.peer_id)
-			elif re.match(r'/deladm @?[0-9A-z_.]*', event.message.text):
-				user_id = get_user_id(event.message.text)
-				db.delete_admin(user_id, event.message.peer_id)
+		if db.check_admin(user_id=event.message.from_id,
+		                  chat_id=event.message.peer_id,
+		                  vk_admins=get_chat_admins(event.message.peer_id)):
+			user_id = get_user_id(event.message.text)
+			if user_id is None:
+				user_id = dict(event.message).get('reply_message', {}).get('from_id')  # ахуенный питон, ебал рот
+			if re.match(r'/mute( @?[0-9A-z_.]*)?', event.message.text):
+				if user_id is not None:
+					db.mute_pig(user_id, event.message.peer_id)
+			elif re.match(r'/unmute( @?[0-9A-z_.]*)?', event.message.text):
+				if user_id is not None:
+					db.unmute_pig(user_id, event.message.peer_id)
+			elif re.match(r'/addadm( @?[0-9A-z_.]*)?', event.message.text):
+				if user_id is not None:
+					db.add_admin(user_id, event.message.peer_id)
+			elif re.match(r'/deladm( @?[0-9A-z_.]*)?', event.message.text):
+				if user_id is not None:
+					db.delete_admin(user_id, event.message.peer_id)
 			elif re.match(r'/chance [A-z0-9]* [01]?\.[0-9]*', event.message.text):
 				db.set_feature_chance(feature=event.message.text.split()[1],
 										chat_id=event.message.peer_id,
 										chance=float(event.message.text.split()[2]))
 			elif re.match(r'/del', event.message.text):
-				for msg in event.message.fwd_messages:
+				for msg in event.message.fwd_messages + [dict(event.message).get('reply_message', {})]:
 					try:
 						vk.messages.delete(v='5.131', delete_for_all=1,
 										conversation_message_ids=msg.get('conversation_message_id'),
@@ -123,7 +137,7 @@ def main():
 					vk.messages.delete(v='5.131', delete_for_all=1,
 									conversation_message_ids=event.message.conversation_message_id,
 									peer_id=event.message.peer_id)
-					vk.messages.send(message=f'Удалил {len(event.message.fwd_messages)} беброчек',
+					vk.messages.send(message=f'Удалил {len(event.message.fwd_messages + [dict(event.message).get("reply_message", {})])} беброчек',
 									v='5.131',
 									peer_id=event.message.peer_id,
 									random_id=0)
