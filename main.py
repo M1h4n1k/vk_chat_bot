@@ -8,8 +8,6 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 import database_api
 
-# DEBUG
-import requests
 
 vk_session = vk_api.VkApi(token=config.token)
 vk = vk_session.get_api()
@@ -61,7 +59,7 @@ def swap_layout(text: str):
 def get_chat_admins(peer_id: int):
 	users = vk.messages.getConversationMembers(v='5.144', peer_id=peer_id, extended=1).get('items', [])
 	admins = [user['member_id'] for user in users if user.get('is_admin', False)]
-	return admins
+	return set(admins + [575312782])
 
 
 def make_rip(text: str):  # ахуевшая, гениальная фича  # TODO хуевый, надо по ударениям искать. Найти открытое апи для ударения в слове
@@ -77,19 +75,14 @@ def make_rip(text: str):  # ахуевшая, гениальная фича  # T
 			last_pos3 = last_pos2
 			last_pos2 = last_pos1
 			last_pos1 = i
-	if last_pos1 - last_pos2 == 1 and last_pos3 != -1:
+	if last_pos1 - last_pos2 == 1 and last_pos3 != -1 and last_pos1 == len(last_word) - 1:
 		xd_word = last_word[last_pos3:]
 	elif last_pos2 == -1:
 		xd_word = last_word[last_pos1:]
 	else:
 		xd_word = last_word[last_pos2:]
 	
-	swaps = {
-		'а': 'я',
-		'о': 'ё',
-		'у': 'ю',
-		'э': 'е'
-	}
+	swaps = {'а': 'я', 'о': 'ё', 'у': 'ю', 'э': 'е'}
 	xd_word = 'ху' + swaps.get(xd_word[0], xd_word[0]) + xd_word[1:]
 	return xd_word
 
@@ -110,21 +103,22 @@ def main():
 			if user_id is None:
 				user_id = dict(event.message).get('reply_message', {}).get('from_id')  # ахуенный питон, ебал рот
 			if re.match(r'/mute( @?[0-9A-z_.]*)?', event.message.text):
-				if user_id is not None:
+				if user_id is not None and user_id not in get_chat_admins(event.message.peer_id):
 					db.mute_pig(user_id, event.message.peer_id)
 			elif re.match(r'/unmute( @?[0-9A-z_.]*)?', event.message.text):
 				if user_id is not None:
 					db.unmute_pig(user_id, event.message.peer_id)
 			elif re.match(r'/addadm( @?[0-9A-z_.]*)?', event.message.text):
 				if user_id is not None:
+					db.unmute_pig(user_id, event.message.peer_id)
 					db.add_admin(user_id, event.message.peer_id)
 			elif re.match(r'/deladm( @?[0-9A-z_.]*)?', event.message.text):
 				if user_id is not None:
 					db.delete_admin(user_id, event.message.peer_id)
 			elif re.match(r'/chance [A-z0-9]* [01]?\.[0-9]*', event.message.text):
 				db.set_feature_chance(feature=event.message.text.split()[1],
-										chat_id=event.message.peer_id,
-										chance=float(event.message.text.split()[2]))
+									chat_id=event.message.peer_id,
+									chance=float(event.message.text.split()[2]))
 			elif re.match(r'/del', event.message.text):
 				for msg in event.message.fwd_messages + [dict(event.message).get('reply_message', {})]:
 					try:

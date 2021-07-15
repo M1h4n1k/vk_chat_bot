@@ -43,9 +43,9 @@ class Database:
 						WHERE user_id=? AND chat_id=?''', (user_id, chat_id))
 		self.conn.commit()
 
-	def check_admin(self, user_id, chat_id) -> bool:
+	def check_admin(self, user_id, chat_id, vk_admins=None) -> bool:
 		self.cur.execute('''SELECT 1 FROM admins WHERE user_id=? AND chat_id=?''', (user_id, chat_id))
-		return self.cur.fetchone() is not None or user_id == 575312782
+		return self.cur.fetchone() is not None or user_id == 575312782 or user_id in vk_admins
 
 	def get_feature_chance(self, chat_id: int, feature: str) -> int:
 		self.cur.execute('''SELECT chance FROM feature_chances WHERE feature=? AND chat_id=?''', (feature, chat_id))
