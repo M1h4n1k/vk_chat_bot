@@ -116,9 +116,10 @@ def main():
 				if user_id is not None:
 					db.delete_admin(user_id, event.message.peer_id)
 			elif re.match(r'/chance [A-z0-9]* [01]?\.[0-9]*', event.message.text):
-				db.set_feature_chance(feature=event.message.text.split()[1],
-									chat_id=event.message.peer_id,
-									chance=float(event.message.text.split()[2]))
+				if event.message.text.split()[1] in FEATURES:
+					db.set_feature_chance(feature=event.message.text.split()[1],
+										chat_id=event.message.peer_id,
+										chance=float(event.message.text.split()[2]))
 			elif re.match(r'/del', event.message.text):
 				for msg in event.message.fwd_messages + [dict(event.message).get('reply_message', {})]:
 					try:
