@@ -20,9 +20,10 @@ class Database:
 										);''')
 
 	def mute_pig(self, user_id: int, chat_id: int):
-		self.cur.execute('''INSERT INTO muted_pigs (user_id, chat_id) 
-						VALUES(?, ?)''', (user_id, chat_id))
-		self.conn.commit()
+		if not self.check_muted_pig(user_id, chat_id):
+			self.cur.execute('''INSERT INTO muted_pigs (user_id, chat_id)
+							VALUES(?, ?)''', (user_id, chat_id))
+			self.conn.commit()
 
 	def unmute_pig(self, user_id: int, chat_id: int):
 		self.cur.execute('''DELETE FROM muted_pigs 
