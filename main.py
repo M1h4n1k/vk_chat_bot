@@ -8,6 +8,8 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 import database_api
 
+# DEBUG
+import requests
 
 vk_session = vk_api.VkApi(token=config.token)
 vk = vk_session.get_api()
@@ -52,8 +54,13 @@ def swap_layout(text: str):
 	return text
 
 
+
 def make_rip(text: str):  # ахуевшая, гениальная фича  # TODO хуевый, надо по ударениям искать. Найти открытое апи для ударения в слове
 	last_word = text.split()[-1].lower()
+	# xd_word = requests.post('https://ws3.morpher.ru/russian/addstressmarks?format=json',
+	# 						headers={'Content-Type': 'text/plain; charset=utf-8'},
+	# 						data=last_word.encode()).text.replace('"', '')
+	# xd_word = xd_word[xd_word.find('\u0301') - 1] + xd_word[xd_word.find('\u0301') + 1:]
 	vowels = 'аеиоуёэюяы'
 	last_pos1 = last_pos2 = last_pos3 = -1
 	for i in range(len(last_word)):
@@ -67,7 +74,7 @@ def make_rip(text: str):  # ахуевшая, гениальная фича  # T
 		xd_word = last_word[last_pos1:]
 	else:
 		xd_word = last_word[last_pos2:]
-
+	
 	swaps = {
 		'а': 'я',
 		'о': 'ё',
@@ -181,5 +188,4 @@ def main():
 
 
 if __name__ == '__main__':
-	# print(re.match(r'/chance [A-z0-9]* [01]?\.[0-9]*', '/chance rip 0.9'))
 	main()
