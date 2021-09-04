@@ -145,7 +145,7 @@ def reset_link(user_id, event):
 		traceback.print_exc()
 
 
-def help_message(user_id, event):
+def help_message(event):
 	vk.messages.send(
 		message=f"Функции доступные только для администраторов:\n\t" + '\n\t'.join(FEATURES['admin_features'].keys()) +
 		        f"\nФункции доступные всем:\n\t" + '\n\t'.join(FEATURES['public_features'].keys()),
